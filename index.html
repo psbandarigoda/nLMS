@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nLMS</title>
+    <style>
+        .hidden { display: none; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>nLearning Q&A Platform</h1>
+    
+    <div id="signIn">
+        <h2>User Authentication</h2>
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button onclick="signIn()">Sign In</button>
+    </div>
+
+    <div id="signUp">
+        <h2>User Authentication</h2>
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <input type="text" id="name" placeholder="Name" required>
+        <input type="tel" id="mobile" placeholder="Mobile Number" required>
+        <button onclick="signUp()">Sign Up</button>
+    </div>
+
+    <div id="userView" class="hidden">
+        <h2>Welcome, <span id="userName"></span></h2>
+        <p>Email: <span id="userEmail"></span></p>
+        <p>Mobile: <span id="userMobile"></span></p>
+        <button onclick="signOut()">Sign Out</button>
+        <button onclick="refreshData()">Refresh Data</button>
+        <h3>Submit a New Question</h3>
+        <select id="topicSelect">
+            <option value="general">General</option>
+            <option value="technology">Technology</option>
+            <option value="science">Science</option>
+            <option value="history">History</option>
+        </select>
+        <input type="text" id="newQuestion" placeholder="Enter your question">
+        <button onclick="submitQuestion()">Submit Question</button>
+        <div id="userQuestions"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCMoF8rgNhlZqMcTNkqy825zHc__8bu39Y",
+            authDomain: "n-onlineworkshop.firebaseapp.com",
+            databaseURL: "https://n-onlineworkshop-default-rtdb.firebaseio.com",
+            projectId: "n-onlineworkshop",
+            storageBucket: "n-onlineworkshop.appspot.com",
+            messagingSenderId: "87034500395",
+            appId: "1:87034500395:web:ebe718c6598d9a383ba16e",
+            measurementId: "G-BSYSV4Z54T"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        function signUp() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value;
+            const mobile = document.getElementById('mobile').value;
+
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    return database.ref('users/' + user.uid).set({
+                        name: name,
+                        email: email,
+                        mobile: mobile
+                    });
+                })
+                .then(() => {
+                    console.log('User signed up and data saved');
+                })
+                .catch((error) => {
+                    console.error('Sign up error:', error.message);
+                });
+        }
+
+        function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    console.log('User signed in:', userCredential.user);
+                })
+                .catch((error) => {
+                    console.error('Sign in error:', error.message);
+                });
+        }
+
+        function signOut() {
+            auth.signOut()
+                .then(() => {
+                    console.log('User signed out');
+                    clearUserData();
+                })
+                .catch((error) => {
+                    console.error('Sign out error:', error.message);
+                });
+        }
+
+        function clearUserData() {
+            document.getElementById('userName').textContent = '';
+            document.getElementById('userEmail').textContent = '';
+            document.getElementById('userMobile').textContent = '';
+            document.getElementById('userQuestions').innerHTML = '';
+            document.getElementById('newQuestion').value = '';
+        }
+
+        function refreshData() {
+            loadUserData();
+            loadUserQuestions();
+        }
+
+        function submitQuestion() {
+            const user = auth.currentUser;
+            const question = document.getElementById('newQuestion').value;
+            const topic = document.getElementById('topicSelect').value;
+            if (user && question && topic) {
+                const newQuestionRef = database.ref(`users/${user.uid}/questions`).push();
+                newQuestionRef.set({
+                    question: question,
+                    topic: topic,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    answer: "pending"
+                }).then(() => {
+                    console.log('Question submitted');
+                    document.getElementById('newQuestion').value = '';
+                    loadUserQuestions();
+                }).catch((error) => {
+                    console.error('Submit question error:', error.message);
+                });
+            }
+        }
+
+        function loadUserData() {
+            const user = auth.currentUser;
+            if (user) {
+                database.ref('users/' + user.uid).once('value')
+                    .then((snapshot) => {
+                        const userData = snapshot.val();
+                        document.getElementById('userName').textContent = userData.name;
+                        document.getElementById('userEmail').textContent = userData.email;
+                        document.getElementById('userMobile').textContent = userData.mobile;
+                    })
+                    .catch((error) => {
+                        console.error('Load user data error:', error.message);
+                    });
+            }
+        }
+
+        function loadUserQuestions() {
+            const user = auth.currentUser;
+            if (user) {
+                database.ref(`users/${user.uid}/questions`).orderByChild('timestamp').once('value')
+                    .then((snapshot) => {
+                        displayUserQuestions(snapshot.val());
+                    })
+                    .catch((error) => {
+                        console.error('Load user questions error:', error.message);
+                    });
+            }
+        }
+
+        function displayUserQuestions(questions) {
+            const userQuestionsDiv = document.getElementById('userQuestions');
+            userQuestionsDiv.innerHTML = '<h3>Your Questions</h3>';
+
+            if (questions) {
+                const table = document.createElement('table');
+                const headerRow = table.insertRow();
+                ['Topic', 'Question', 'Answer', 'Timestamp'].forEach(header => {
+                    const th = document.createElement('th');
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+
+                Object.entries(questions).forEach(([key, data]) => {
+                    const row = table.insertRow();
+                    row.insertCell().textContent = data.topic;
+                    row.insertCell().textContent = data.question;
+                    row.insertCell().textContent = data.answer;
+                    row.insertCell().textContent = new Date(data.timestamp).toLocaleString();
+                });
+
+                userQuestionsDiv.appendChild(table);
+            } else {
+                userQuestionsDiv.innerHTML += '<p>No questions submitted yet.</p>';
+            }
+        }
+
+        auth.onAuthStateChanged((user) => {
+            const userView = document.getElementById('userView');
+            const signUpDiv = document.getElementById('signUp');
+            const signInDiv = document.getElementById('signIn');
+
+            if (user) {
+                signUpDiv.classList.add('hidden');
+                signInDiv.classList.add('hidden');
+                userView.classList.remove('hidden');
+                loadUserData();
+                loadUserQuestions();
+            } else {
+                userView.classList.add('hidden');
+                signUpDiv.classList.remove('hidden');
+                signInDiv.classList.remove('hidden');
+                clearUserData();
+            }
+        });
+    </script>
+</body>
+</html>
