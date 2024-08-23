@@ -16,34 +16,52 @@
     
     <div id="signIn">
         <h2>User Authentication</h2>
-        <input type="email" id="email" placeholder="Email" required>
-        <input type="password" id="password" placeholder="Password" required>
+        <div id="signInError" style="color: red;"></div>
+        <input type="email" id="signInEmail" placeholder="Email" required>
+        <input type="password" id="signInPassword" placeholder="Password" required>
         <button onclick="signIn()">Sign In</button>
     </div>
 
     <div id="signUp">
         <h2>User Authentication</h2>
-        <input type="email" id="email" placeholder="Email" required>
-        <input type="password" id="password" placeholder="Password" required>
-        <input type="text" id="name" placeholder="Name" required>
+        <div id="signUpError" style="color: red;"></div>
+        <input type="email" id="signUpEmail" placeholder="Email" required>
+        <input type="password" id="signUpPassword" placeholder="Password" required>
+        <input type="text" id="firstName" placeholder="First Name" required>
+        <input type="text" id="lastName" placeholder="Last Name" required>
         <input type="tel" id="mobile" placeholder="Mobile Number" required>
         <button onclick="signUp()">Sign Up</button>
     </div>
 
     <div id="userView" class="hidden">
-        <h2>Welcome, <span id="userName"></span></h2>
+        <h2>Welcome, <span id="firstName"></span></h2>
+        <p>Name: <span id="userName"></span></p>
         <p>Email: <span id="userEmail"></span></p>
-        <p>Mobile: <span id="userMobile"></span></p>
         <button onclick="signOut()">Sign Out</button>
         <button onclick="refreshData()">Refresh Data</button>
         <h3>Submit a New Question</h3>
         <select id="topicSelect">
-            <option value="general">General</option>
-            <option value="technology">Technology</option>
-            <option value="science">Science</option>
-            <option value="history">History</option>
-        </select>
-        <input type="text" id="newQuestion" placeholder="Enter your question">
+            <option value="introduction">Introduction</option>
+            <option value="about-data-structures">About Data Structures</option>
+            <option value="about-algorithms">About Algorithms</option>
+            <option value="computer-memory">Computer Memory</option>
+            <option value="importance-of-variables">Importance of Variables</option>
+            <option value="fundamental-dsa">Fundamental DSA</option>
+            <option value="arrays">Arrays</option>
+            <option value="lists">Lists</option>
+            <option value="stacks">Stacks</option>
+            <option value="queues">Queues</option>
+            <option value="linked-lists">Linked Lists</option>
+            <option value="recursion">Recursion</option>
+            <option value="algorithms-sorting">Algorithms for sorting</option>
+            <option value="algorithms-searching">Algorithms for searching</option>
+            <option value="algorithm-performance">Algorithm performance</option>
+            <option value="other">Other</option>
+            <option value="industry">Industry</option>
+            <option value="career">Career</option>
+        </select>             
+        <br><br>
+        <textarea id="newQuestion" placeholder="Enter your question" rows="2" style="width: 60%; resize: vertical;"></textarea>
         <button onclick="submitQuestion()">Submit Question</button>
         <div id="userQuestions"></div>
     </div>
@@ -70,37 +88,58 @@
         const database = firebase.database();
 
         function signUp() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const name = document.getElementById('name').value;
-            const mobile = document.getElementById('mobile').value;
+            const email = document.getElementById('signUpEmail').value.trim();
+            const password = document.getElementById('signUpPassword').value;
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const mobile = document.getElementById('mobile').value.trim();
+
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                displayError('signUpError', 'Please enter a valid email address.');
+                return;
+            }
 
             auth.createUserWithEmailAndPassword(email, password)
                 .then((userCredential) => {
                     const user = userCredential.user;
                     return database.ref('users/' + user.uid).set({
-                        name: name,
+                        firstName: firstName,
+                        lastName: lastName,
                         email: email,
                         mobile: mobile
                     });
                 })
                 .then(() => {
                     console.log('User signed up and data saved');
+                    clearError('signUpError');
                 })
                 .catch((error) => {
                     console.error('Sign up error:', error.message);
+                    displayError('signUpError', error.message);
                 });
         }
 
         function signIn() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
+            const email = document.getElementById('signInEmail').value.trim();
+            const password = document.getElementById('signInPassword').value;
+
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                displayError('signInError', 'Please enter a valid email address.');
+                return;
+            }
+
             auth.signInWithEmailAndPassword(email, password)
                 .then((userCredential) => {
                     console.log('User signed in:', userCredential.user);
+                    clearError('signInError');
                 })
                 .catch((error) => {
                     console.error('Sign in error:', error.message);
+                    displayError('signInError', error.message);
                 });
         }
 
@@ -115,10 +154,18 @@
                 });
         }
 
+        function displayError(elementId, message) {
+            document.getElementById(elementId).textContent = message;
+        }
+
+        function clearError(elementId) {
+            document.getElementById(elementId).textContent = '';
+        }
+
         function clearUserData() {
+            document.getElementById('firstName').textContent = '';
             document.getElementById('userName').textContent = '';
             document.getElementById('userEmail').textContent = '';
-            document.getElementById('userMobile').textContent = '';
             document.getElementById('userQuestions').innerHTML = '';
             document.getElementById('newQuestion').value = '';
         }
@@ -155,9 +202,9 @@
                 database.ref('users/' + user.uid).once('value')
                     .then((snapshot) => {
                         const userData = snapshot.val();
-                        document.getElementById('userName').textContent = userData.name;
+                        document.getElementById('firstName').textContent = userData.firstName;
+                        document.getElementById('userName').textContent = `${userData.firstName} ${userData.lastName}`;
                         document.getElementById('userEmail').textContent = userData.email;
-                        document.getElementById('userMobile').textContent = userData.mobile;
                     })
                     .catch((error) => {
                         console.error('Load user data error:', error.message);
